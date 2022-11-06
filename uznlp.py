@@ -7,12 +7,14 @@ import requests
 import torch
 from transformers import pipeline
 
+
+# Global variables
 API_KEY = 'AIzaSyDzNkKPC8uNyx-3lkjz7sh7MaF5XWqXHhA'
 
 SEMANTIC_LABELS = {
     'LABEL_0': 'Negative. Негативный. Negativ.',
     'LABEL_1': 'Neutral. Нейтральный. Neytral.',
-    'LABEL_2': 'Positive. Позитивнвый. Pozitiv.'
+    'LABEL_2': 'Positive. Позитивный. Pozitiv.'
 }
 
 
@@ -37,10 +39,10 @@ def load_models():
     semantic = pipeline("text-classification", model='cardiffnlp/twitter-roberta-base-sentiment')
 
     # Load toxicity model
-    # toxicity = pipeline("text-classification", model='unitary/toxic-bert')
+    toxicity = pipeline("text-classification", model='unitary/toxic-bert')
 
     # Load generation model
-    # generation = pipeline("text-generation")
+    generation = pipeline("text-generation")
 
     # Load image captioning model
     qa = pipeline("question-answering")
@@ -48,8 +50,8 @@ def load_models():
     return {
         'summarizer': summarizer,
         'semantic': semantic,
-        # 'toxicity': toxicity,
-        # 'generation': generation,
+        'toxicity': toxicity,
+        'generation': generation,
         'qa': qa,
     }
 
@@ -64,9 +66,6 @@ def cached_variables():
     }
 
 
-# Global variables
-
-
 
 if __name__ == '__main__':
     # Load models
@@ -74,7 +73,7 @@ if __name__ == '__main__':
 
     # Sidebar menu
     st.sidebar.header('UzNLP')
-    option = st.sidebar.selectbox('Select model', (' ', 
+    option = st.sidebar.selectbox('Select model. Model tanlang. Выберите Модель.', (' ', 
                                                   'Summarization', 
                                                   'Sentiment Classification',
                                                   'Toxicity Classification', 
@@ -85,15 +84,7 @@ if __name__ == '__main__':
 
     # Landing page
     if option == ' ':
-        title = 'UzNLP'
-        intro_message_uzb = "NLP modellar o'zbek tillida."
-        intro_message_rus = "НЛП модели на узбекском языке."
-        intro_message_eng = "NLP models in Uzbek language."
-        st.markdown(f"<h1 style='text-align: center; color: white;'>{title}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<h3 style='text-align: center; color: white;'>{intro_message_uzb}</h3>", unsafe_allow_html=True)
-        st.markdown(f"<h3 style='text-align: center; color: white;'>{intro_message_rus}</h3>", unsafe_allow_html=True)
-        st.markdown(f"<h3 style='text-align: center; color: white;'>{intro_message_eng}</h3>", unsafe_allow_html=True)
-        landing_img_path = 'C:\\Users\\Otabek Nazarov\\Desktop\\ML\\kaggle\\medtrain\\data\\landing.jpg'
+        landing_img_path = 'landing.jpg'
         landing_image = io.imread(landing_img_path, as_gray=False)
         col1, col2, col3 = st.columns([0.1, 7, 0.1])
         col2.image(landing_image)
@@ -142,16 +133,16 @@ if __name__ == '__main__':
 
         col1.text_area(
             "Kiritish. Input. Ввод.", 
-            key="question",
+            key="sent_question",
             height=200,
             )
-        query_uzb = st.session_state.question
+        query_uzb = st.session_state.sent_question
         query_eng = translate_to_english(query_uzb)
 
         
         if query_eng == '':
             answer = ''
-            score= ''
+            score = ''
         else:
             result = models_dict['semantic'](query_eng)[0]
             answer = SEMANTIC_LABELS[result['label']]
@@ -183,13 +174,13 @@ if __name__ == '__main__':
 
         
         if query_eng == '':
-            answer = ''
+            toxicity_score = ''
         else:
-            toxicity_score = models_dict['toxicity'](query_eng)[0]['score']
+            toxicity_score = f"Toxicity - ({models_dict['toxicity'](query_eng)[0]['score']*100:.1f} %)"
 
         col2.text_area(
             label="Natija. Результат. Result.",
-            value=f"Toxicity - {toxicity_score*100:.1f}", 
+            value=f"{toxicity_score}", 
             key="answer",
             height=200,
             )
@@ -213,7 +204,7 @@ if __name__ == '__main__':
 
         
         if query_eng == '':
-            answer = ''
+            answer_uzb = ''
         else:
             answer_eng = models_dict['generation'](query_eng,max_length=180)[0]['generated_text']
             answer_uzb = translate_to_uzbek(answer_eng)
@@ -263,13 +254,13 @@ if __name__ == '__main__':
         col1.text_area(
             "Tekst. Text. Текст.", 
             key="context",
-            height=200,
+            height=150,
             )
 
         col1.text_area(
             "Savol. Question. Вопрос.", 
             key="question",
-            height=100,
+            height=50,
             )
 
         context_uzb = st.session_state.context
@@ -292,5 +283,5 @@ if __name__ == '__main__':
             label="Natija. Результат. Result.",
             value=f"{answer_uzb} {score}", 
             key="answer",
-            height=300,
+            height=295,
             )
