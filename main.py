@@ -1,70 +1,9 @@
 # Imports
 import streamlit as st
 from skimage import io
-import requests
 
-# Model related imports
-import torch
-from transformers import pipeline
-
-
-# Global variables
-API_KEY = 'AIzaSyDzNkKPC8uNyx-3lkjz7sh7MaF5XWqXHhA'
-
-SEMANTIC_LABELS = {
-    'LABEL_0': 'Negative. Негативный. Negativ.',
-    'LABEL_1': 'Neutral. Нейтральный. Neytral.',
-    'LABEL_2': 'Positive. Позитивный. Pozitiv.'
-}
-
-
-def translate_to_english(text):
-    r = requests.get(f'https://translation.googleapis.com/language/translate/v2?key={API_KEY}&q={text}&souce=uz&target=en')
-    return r.json()['data']['translations'][0]['translatedText']
-
-
-def translate_to_uzbek(text):
-    r = requests.get(f'https://translation.googleapis.com/language/translate/v2?key={API_KEY}&q={text}&souce=en&target=uz')
-    return r.json()['data']['translations'][0]['translatedText']
-
-
-# Load main models
-@st.cache(allow_output_mutation=True,
-          hash_funcs={torch.nn.parameter.Parameter: lambda parameter: parameter.data.numpy()})
-def load_models():
-    # Load summarization model
-    summarizer = pipeline("summarization")
-
-    # Load semantic classification model
-    semantic = pipeline("text-classification", model='cardiffnlp/twitter-roberta-base-sentiment')
-
-    # Load toxicity model
-    toxicity = pipeline("text-classification", model='unitary/toxic-bert')
-
-    # Load generation model
-    generation = pipeline("text-generation")
-
-    # Load image captioning model
-    qa = pipeline("question-answering")
-
-    return {
-        'summarizer': summarizer,
-        'semantic': semantic,
-        'toxicity': toxicity,
-        'generation': generation,
-        'qa': qa,
-    }
-
-
-# Variables for storing app persistent data
-@st.cache(persist=True, allow_output_mutation=True)
-def cached_variables():
-    return {
-        'img_idx': 0,
-        'your_answer': '',
-        'xray_idx': 0
-    }
-
+from constants import SEMANTIC_LABELS
+from utils import translate_to_english, translate_to_uzbek, load_models
 
 
 if __name__ == '__main__':
@@ -92,13 +31,12 @@ if __name__ == '__main__':
     # Text summarization
     elif option == 'Summarization':
         # General UI
-        app_cache = cached_variables()
         st.title('Text summarization. Суммаризация текста. Tekst summariziyasi.')
         st.markdown(' ')
         st.markdown(' ')
-        
         col1, col2 = st.columns([1, 1])
 
+        # Get text to summarize
         col1.text_area(
             "Kiritish. Input. Ввод.", 
             key="question",
@@ -107,7 +45,7 @@ if __name__ == '__main__':
         query_uzb = st.session_state.question
         query_eng = translate_to_english(query_uzb)
 
-        
+        # Get summary from model
         if query_eng == '':
             answer_uzb = ''
         else:
@@ -115,6 +53,7 @@ if __name__ == '__main__':
             answer_uzb = translate_to_uzbek(answer_eng)
             answer_uzb = answer_uzb.replace("&#39;", "'")
 
+        # Display the results
         col2.text_area(
             label="Natija. Результат. Result.",
             value=f"{answer_uzb}", 
@@ -124,13 +63,12 @@ if __name__ == '__main__':
 
     # Sentiment classification   
     elif option == 'Sentiment Classification':
-        app_cache = cached_variables()
         st.title('Sentiment classifier. Классификация сентиментов. Sentiment klassifikaciyasi.')
         st.markdown(' ')
         st.markdown(' ')
-
         col1, col2 = st.columns([1, 1])
 
+        # Get text for semantic classification
         col1.text_area(
             "Kiritish. Input. Ввод.", 
             key="sent_question",
@@ -139,7 +77,7 @@ if __name__ == '__main__':
         query_uzb = st.session_state.sent_question
         query_eng = translate_to_english(query_uzb)
 
-        
+        # Get classification result
         if query_eng == '':
             answer = ''
             score = ''
@@ -148,6 +86,7 @@ if __name__ == '__main__':
             answer = SEMANTIC_LABELS[result['label']]
             score = f"({result['score']*100:.1f} %)"
 
+        # Display the result
         col2.text_area(
             label="Natija. Результат. Result.",
             value=f"{answer} {score}", 
@@ -157,13 +96,13 @@ if __name__ == '__main__':
     
     # Toxicity classification   
     elif option == 'Toxicity Classification':
-        app_cache = cached_variables()
+        # General UI
         st.title('Toxicity classifier. Классификация токсичности. Yomon soz klassifikaciyasi.')
         st.markdown(' ')
         st.markdown(' ')
-
         col1, col2 = st.columns([1, 1])
 
+        # Get text for toxicity classification
         col1.text_area(
             "Kiritish. Input. Ввод.", 
             key="question",
@@ -172,12 +111,13 @@ if __name__ == '__main__':
         query_uzb = st.session_state.question
         query_eng = translate_to_english(query_uzb)
 
-        
+        # Get classification results
         if query_eng == '':
             toxicity_score = ''
         else:
             toxicity_score = f"Toxicity - ({models_dict['toxicity'](query_eng)[0]['score']*100:.1f} %)"
 
+        # Display the result
         col2.text_area(
             label="Natija. Результат. Result.",
             value=f"{toxicity_score}", 
@@ -187,13 +127,13 @@ if __name__ == '__main__':
 
     # Text generation
     elif option == 'Generation':
-        app_cache = cached_variables()
+        # General UI
         st.title('Text generation. Генерация текста. Tekst generatsiyasi.')
         st.markdown(' ')
         st.markdown(' ')
-
         col1, col2 = st.columns([1, 1])
 
+        # Get initial prompt for text generation
         col1.text_area(
             "Kiritish. Input. Ввод.", 
             key="question",
@@ -202,7 +142,7 @@ if __name__ == '__main__':
         query_uzb = st.session_state.question
         query_eng = translate_to_english(query_uzb)
 
-        
+        # Get model's generation result
         if query_eng == '':
             answer_uzb = ''
         else:
@@ -210,6 +150,7 @@ if __name__ == '__main__':
             answer_uzb = translate_to_uzbek(answer_eng)
             answer_uzb = answer_uzb.replace("&#39;", "'")
 
+        # Display the result
         col2.text_area(
             label="Natija. Результат. Result.",
             value=f"{answer_uzb}", 
@@ -220,21 +161,21 @@ if __name__ == '__main__':
 
     # Text translation
     elif option == 'Translation':
-        app_cache = cached_variables()
         st.title('Text translation. Перевод текста. Tekst tarjimasi.')
         st.markdown(' ')
         st.markdown(' ')
-
         col1, col2 = st.columns([1, 1])
 
+        # Get text in Uzbek and translate it to English
         col1.text_area(
             "Kiritish. Input. Ввод.", 
-            key="question",
+            key="gen_question",
             height=200,
             )
-        query_uzb = st.session_state.question
-        query_eng = translate_to_english(query_uzb)
+        query_uzb = st.session_state.gen_question
+        query_eng = translate_to_english(query_uzb).replace("&#39;", "'")
 
+        # Display translation result
         col2.text_area(
             label="Natija. Результат. Result.",
             value=f"{query_eng}", 
@@ -244,31 +185,33 @@ if __name__ == '__main__':
 
     # Question answering
     elif option == 'Question Answering':
-        app_cache = cached_variables()
+        # General UI
         st.title('Question Answering. Вопросы-ответы. Savol-javoblar.')
         st.markdown(' ')
         st.markdown(' ')
-
         col1, col2 = st.columns([1, 1])
 
+        # Get context for QA model
         col1.text_area(
             "Tekst. Text. Текст.", 
             key="context",
             height=150,
             )
 
+        # Get question for QA model
         col1.text_area(
             "Savol. Question. Вопрос.", 
             key="question",
             height=50,
             )
 
+        # Translate into Enlgish
         context_uzb = st.session_state.context
         query_uzb = st.session_state.question
         context_eng = translate_to_english(context_uzb)
         query_eng = translate_to_english(query_uzb)
 
-        
+        # Get model results
         if query_eng == '':
             answer_uzb = ''
             score = ''
@@ -279,6 +222,7 @@ if __name__ == '__main__':
             answer_uzb = translate_to_uzbek(answer_eng)
             answer_uzb = answer_uzb.replace("&#39;", "'")
 
+        # Display results
         col2.text_area(
             label="Natija. Результат. Result.",
             value=f"{answer_uzb} {score}", 
