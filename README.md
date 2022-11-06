@@ -5,9 +5,10 @@
 
 
 ### Main libries used for software
-Full list available [here](requirements.txt)
-- transformers (HuggingFace)
-- streamlit <br>
+```
+transformers
+streamlit
+```
 
 
 ### Running the program
