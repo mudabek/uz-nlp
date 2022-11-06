@@ -9,6 +9,12 @@ from transformers import pipeline
 
 API_KEY = 'AIzaSyDzNkKPC8uNyx-3lkjz7sh7MaF5XWqXHhA'
 
+SEMANTIC_LABELS = {
+    'LABEL_0': 'Negative. Негативный. Negativ.',
+    'LABEL_1': 'Neutral. Нейтральный. Neytral.',
+    'LABEL_2': 'Positive. Позитивнвый. Pozitiv.'
+}
+
 
 def translate_to_english(text):
     r = requests.get(f'https://translation.googleapis.com/language/translate/v2?key={API_KEY}&q={text}&souce=uz&target=en')
@@ -26,9 +32,26 @@ def translate_to_uzbek(text):
 def load_models():
     # Load summarization model
     summarizer = pipeline("summarization")
-    summarizer("An apple a day, keeps the doctor away", min_length=5, max_length=20)
 
-    return summarizer
+    # Load semantic classification model
+    semantic = pipeline("text-classification", model='cardiffnlp/twitter-roberta-base-sentiment')
+
+    # Load toxicity model
+    # toxicity = pipeline("text-classification", model='unitary/toxic-bert')
+
+    # Load generation model
+    # generation = pipeline("text-generation")
+
+    # Load image captioning model
+    qa = pipeline("question-answering")
+
+    return {
+        'summarizer': summarizer,
+        'semantic': semantic,
+        # 'toxicity': toxicity,
+        # 'generation': generation,
+        'qa': qa,
+    }
 
 
 # Variables for storing app persistent data
@@ -47,15 +70,17 @@ def cached_variables():
 
 if __name__ == '__main__':
     # Load models
-    summarizer = load_models()
+    models_dict = load_models()
 
     # Sidebar menu
     st.sidebar.header('UzNLP')
     option = st.sidebar.selectbox('Select model', (' ', 
                                                   'Summarization', 
-                                                  'Sentiment', 
+                                                  'Sentiment Classification',
+                                                  'Toxicity Classification', 
                                                   'Generation',
-                                                  'Translation', 
+                                                  'Translation',
+                                                  'Question Answering', 
                                                   ))
 
     # Landing page
@@ -73,7 +98,7 @@ if __name__ == '__main__':
         col1, col2, col3 = st.columns([0.1, 7, 0.1])
         col2.image(landing_image)
 
-    # Breast cancer classifier page
+    # Text summarization
     elif option == 'Summarization':
         # General UI
         app_cache = cached_variables()
@@ -93,13 +118,11 @@ if __name__ == '__main__':
 
         
         if query_eng == '':
-            answer = ''
+            answer_uzb = ''
         else:
-            answer_eng = summarizer(query_eng, min_length=5, max_length=150)[0]['summary_text']
+            answer_eng = models_dict['summarizer'](query_eng, min_length=5, max_length=150)[0]['summary_text']
             answer_uzb = translate_to_uzbek(answer_eng)
             answer_uzb = answer_uzb.replace("&#39;", "'")
-
-        # print(f'{question_uzb}-{question_eng}-{answer_eng}-{answer_uzb}')
 
         col2.text_area(
             label="Natija. Результат. Result.",
@@ -108,21 +131,166 @@ if __name__ == '__main__':
             height=200,
             )
 
-    # Chest X-ray diagnosis page
-    elif option == 'Sentiment':
+    # Sentiment classification   
+    elif option == 'Sentiment Classification':
         app_cache = cached_variables()
-        st.title('Sentiment analysis. Анализ сентиментов. Sentiment analizi.')
+        st.title('Sentiment classifier. Классификация сентиментов. Sentiment klassifikaciyasi.')
         st.markdown(' ')
         st.markdown(' ')
 
+        col1, col2 = st.columns([1, 1])
+
+        col1.text_area(
+            "Kiritish. Input. Ввод.", 
+            key="question",
+            height=200,
+            )
+        query_uzb = st.session_state.question
+        query_eng = translate_to_english(query_uzb)
+
+        
+        if query_eng == '':
+            answer = ''
+            score= ''
+        else:
+            result = models_dict['semantic'](query_eng)[0]
+            answer = SEMANTIC_LABELS[result['label']]
+            score = f"({result['score']*100:.1f} %)"
+
+        col2.text_area(
+            label="Natija. Результат. Result.",
+            value=f"{answer} {score}", 
+            key="answer",
+            height=200,
+            )
+    
+    # Toxicity classification   
+    elif option == 'Toxicity Classification':
+        app_cache = cached_variables()
+        st.title('Toxicity classifier. Классификация токсичности. Yomon soz klassifikaciyasi.')
+        st.markdown(' ')
+        st.markdown(' ')
+
+        col1, col2 = st.columns([1, 1])
+
+        col1.text_area(
+            "Kiritish. Input. Ввод.", 
+            key="question",
+            height=200,
+            )
+        query_uzb = st.session_state.question
+        query_eng = translate_to_english(query_uzb)
+
+        
+        if query_eng == '':
+            answer = ''
+        else:
+            toxicity_score = models_dict['toxicity'](query_eng)[0]['score']
+
+        col2.text_area(
+            label="Natija. Результат. Result.",
+            value=f"Toxicity - {toxicity_score*100:.1f}", 
+            key="answer",
+            height=200,
+            )
+
+    # Text generation
     elif option == 'Generation':
         app_cache = cached_variables()
         st.title('Text generation. Генерация текста. Tekst generatsiyasi.')
         st.markdown(' ')
         st.markdown(' ')
 
+        col1, col2 = st.columns([1, 1])
+
+        col1.text_area(
+            "Kiritish. Input. Ввод.", 
+            key="question",
+            height=200,
+            )
+        query_uzb = st.session_state.question
+        query_eng = translate_to_english(query_uzb)
+
+        
+        if query_eng == '':
+            answer = ''
+        else:
+            answer_eng = models_dict['generation'](query_eng,max_length=180)[0]['generated_text']
+            answer_uzb = translate_to_uzbek(answer_eng)
+            answer_uzb = answer_uzb.replace("&#39;", "'")
+
+        col2.text_area(
+            label="Natija. Результат. Result.",
+            value=f"{answer_uzb}", 
+            key="answer",
+            height=200,
+            )
+        
+
+    # Text translation
     elif option == 'Translation':
         app_cache = cached_variables()
         st.title('Text translation. Перевод текста. Tekst tarjimasi.')
         st.markdown(' ')
         st.markdown(' ')
+
+        col1, col2 = st.columns([1, 1])
+
+        col1.text_area(
+            "Kiritish. Input. Ввод.", 
+            key="question",
+            height=200,
+            )
+        query_uzb = st.session_state.question
+        query_eng = translate_to_english(query_uzb)
+
+        col2.text_area(
+            label="Natija. Результат. Result.",
+            value=f"{query_eng}", 
+            key="answer",
+            height=200,
+            )
+
+    # Question answering
+    elif option == 'Question Answering':
+        app_cache = cached_variables()
+        st.title('Question Answering. Вопросы-ответы. Savol-javoblar.')
+        st.markdown(' ')
+        st.markdown(' ')
+
+        col1, col2 = st.columns([1, 1])
+
+        col1.text_area(
+            "Tekst. Text. Текст.", 
+            key="context",
+            height=200,
+            )
+
+        col1.text_area(
+            "Savol. Question. Вопрос.", 
+            key="question",
+            height=100,
+            )
+
+        context_uzb = st.session_state.context
+        query_uzb = st.session_state.question
+        context_eng = translate_to_english(context_uzb)
+        query_eng = translate_to_english(query_uzb)
+
+        
+        if query_eng == '':
+            answer_uzb = ''
+            score = ''
+        else:
+            result = models_dict['qa'](context=context_eng, question=query_eng)
+            score = f"({result['score']*100:.1f} %)"
+            answer_eng = result['answer']
+            answer_uzb = translate_to_uzbek(answer_eng)
+            answer_uzb = answer_uzb.replace("&#39;", "'")
+
+        col2.text_area(
+            label="Natija. Результат. Result.",
+            value=f"{answer_uzb} {score}", 
+            key="answer",
+            height=300,
+            )
